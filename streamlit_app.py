@@ -1,131 +1,227 @@
+#######################
+# Import libraries
 import streamlit as st
 import pandas as pd
-import datetime
-from PIL import Image
+import altair as alt
 import plotly.express as px
-import plotly.graph_objects as go
 
-# reading the data from excel file
-df = pd.read_excel("Adidas.xlsx")
-st.set_page_config(layout="wide")
-st.markdown('<style>div.block-container{padding-top:1rem;}</style>', unsafe_allow_html=True)
-image = Image.open('adidas-logo.jpg')
+#######################
+# Page configuration
+st.set_page_config(
+    page_title="US Population Dashboard",
+    page_icon="🏂",
+    layout="wide",
+    initial_sidebar_state="expanded")
 
-col1, col2 = st.columns([0.1,0.9])
-with col1:
-    st.image(image,width=100)
+alt.themes.enable("dark")
 
-html_title = """
-    <style>
-    .title-test {
-    font-weight:bold;
-    padding:5px;
-    border-radius:6px;
-    }
-    </style>
-    <center><h1 class="title-test">Adidas Interactive Sales Dashboard</h1></center>"""
-with col2:
-    st.markdown(html_title, unsafe_allow_html=True)
 
-col3, col4, col5 = st.columns([0.1,0.45,0.45])
-with col3:
-    box_date = str(datetime.datetime.now().strftime("%d %B %Y"))
-    st.write(f"Last updated by:  \n {box_date}")
+#######################
+# Load data
+df_reshaped = pd.read_csv('data/us-population-2010-2019-reshaped.csv')
 
-with col4:
-    fig = px.bar(df, x = "Retailer", y = "TotalSales", labels={"TotalSales" : "Total Sales {$}"},
-                 title = "Total Sales by Retailer", hover_data=["TotalSales"],
-                 template="gridon",height=500)
-    st.plotly_chart(fig,use_container_width=True)
 
-_, view1, dwn1, view2, dwn2 = st.columns([0.15,0.20,0.20,0.20,0.20])
-with view1:
-    expander = st.expander("Retailer wise Sales")
-    data = df[["Retailer","TotalSales"]].groupby(by="Retailer")["TotalSales"].sum()
-    expander.write(data)
-with dwn1:
-    st.download_button("Get Data", data = data.to_csv().encode("utf-8"),
-                       file_name="RetailerSales.csv", mime="text/csv")
-
-df["Month_Year"] = df["InvoiceDate"].dt.strftime("%b'%y")
-result = df.groupby(by = df["Month_Year"])["TotalSales"].sum().reset_index()
-
-with col5:
-    fig1 = px.line(result, x = "Month_Year", y = "TotalSales", title="Total Sales Over Time",
-                   template="gridon")
-    st.plotly_chart(fig1,use_container_width=True)
-
-with view2:
-    expander = st.expander("Monthly Sales")
-    data = result
-    expander.write(data)
-with dwn2:
-    st.download_button("Get Data", data = result.to_csv().encode("utf-8"),
-                       file_name="Monthly Sales.csv", mime="text/csv")
+#######################
+# Sidebar
+with st.sidebar:
+    st.title('🏂 US Population Dashboard')
     
-st.divider()
+    year_list = list(df_reshaped.year.unique())[::-1]
+    
+    selected_year = st.selectbox('Select a year', year_list)
+    df_selected_year = df_reshaped[df_reshaped.year == selected_year]
+    df_selected_year_sorted = df_selected_year.sort_values(by="population", ascending=False)
 
-result1 = df.groupby(by="State")[["TotalSales","UnitsSold"]].sum().reset_index()
+    color_theme_list = ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis']
+    selected_color_theme = st.selectbox('Select a color theme', color_theme_list)
 
-# add the units sold as a line chart on a secondary y-axis
-fig3 = go.Figure()
-fig3.add_trace(go.Bar(x = result1["State"], y = result1["TotalSales"], name = "Total Sales"))
-fig3.add_trace(go.Scatter(x=result1["State"], y = result1["UnitsSold"], mode = "lines",
-                          name ="Units Sold", yaxis="y2"))
-fig3.update_layout(
-    title = "Total Sales and Units Sold by State",
-    xaxis = dict(title="State"),
-    yaxis = dict(title="Total Sales", showgrid = False),
-    yaxis2 = dict(title="Units Sold", overlaying = "y", side = "right"),
-    template = "gridon",
-    legend = dict(x=1,y=1.1)
-)
-_, col6 = st.columns([0.1,1])
-with col6:
-    st.plotly_chart(fig3,use_container_width=True)
 
-_, view3, dwn3 = st.columns([0.5,0.45,0.45])
-with view3:
-    expander = st.expander("View Data for Sales by Units Sold")
-    expander.write(result1)
-with dwn3:
-    st.download_button("Get Data", data = result1.to_csv().encode("utf-8"), 
-                       file_name = "Sales_by_UnitsSold.csv", mime="text/csv")
-st.divider()
+#######################
+# Plots
 
-_, col7 = st.columns([0.1,1])
-treemap = df[["Region","City","TotalSales"]].groupby(by = ["Region","City"])["TotalSales"].sum().reset_index()
+# Heatmap
+def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
+    heatmap = alt.Chart(input_df).mark_rect().encode(
+            y=alt.Y(f'{input_y}:O', axis=alt.Axis(title="Year", titleFontSize=18, titlePadding=15, titleFontWeight=900, labelAngle=0)),
+            x=alt.X(f'{input_x}:O', axis=alt.Axis(title="", titleFontSize=18, titlePadding=15, titleFontWeight=900)),
+            color=alt.Color(f'max({input_color}):Q',
+                             legend=None,
+                             scale=alt.Scale(scheme=input_color_theme)),
+            stroke=alt.value('black'),
+            strokeWidth=alt.value(0.25),
+        ).properties(width=900
+        ).configure_axis(
+        labelFontSize=12,
+        titleFontSize=12
+        ) 
+    # height=300
+    return heatmap
 
-def format_sales(value):
-    if value >= 0:
-        return '{:.2f} Lakh'.format(value / 1_000_00)
+# Choropleth map
+def make_choropleth(input_df, input_id, input_column, input_color_theme):
+    choropleth = px.choropleth(input_df, locations=input_id, color=input_column, locationmode="USA-states",
+                               color_continuous_scale=input_color_theme,
+                               range_color=(0, max(df_selected_year.population)),
+                               scope="usa",
+                               labels={'population':'Population'}
+                              )
+    choropleth.update_layout(
+        template='plotly_dark',
+        plot_bgcolor='rgba(0, 0, 0, 0)',
+        paper_bgcolor='rgba(0, 0, 0, 0)',
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=350
+    )
+    return choropleth
 
-treemap["TotalSales (Formatted)"] = treemap["TotalSales"].apply(format_sales)
 
-fig4 = px.treemap(treemap, path = ["Region","City"], values = "TotalSales",
-                  hover_name = "TotalSales (Formatted)",
-                  hover_data = ["TotalSales (Formatted)"],
-                  color = "City", height = 700, width = 600)
-fig4.update_traces(textinfo="label+value")
+# Donut chart
+def make_donut(input_response, input_text, input_color):
+  if input_color == 'blue':
+      chart_color = ['#29b5e8', '#155F7A']
+  if input_color == 'green':
+      chart_color = ['#27AE60', '#12783D']
+  if input_color == 'orange':
+      chart_color = ['#F39C12', '#875A12']
+  if input_color == 'red':
+      chart_color = ['#E74C3C', '#781F16']
+    
+  source = pd.DataFrame({
+      "Topic": ['', input_text],
+      "% value": [100-input_response, input_response]
+  })
+  source_bg = pd.DataFrame({
+      "Topic": ['', input_text],
+      "% value": [100, 0]
+  })
+    
+  plot = alt.Chart(source).mark_arc(innerRadius=45, cornerRadius=25).encode(
+      theta="% value",
+      color= alt.Color("Topic:N",
+                      scale=alt.Scale(
+                          #domain=['A', 'B'],
+                          domain=[input_text, ''],
+                          # range=['#29b5e8', '#155F7A']),  # 31333F
+                          range=chart_color),
+                      legend=None),
+  ).properties(width=130, height=130)
+    
+  text = plot.mark_text(align='center', color="#29b5e8", font="Lato", fontSize=32, fontWeight=700, fontStyle="italic").encode(text=alt.value(f'{input_response} %'))
+  plot_bg = alt.Chart(source_bg).mark_arc(innerRadius=45, cornerRadius=20).encode(
+      theta="% value",
+      color= alt.Color("Topic:N",
+                      scale=alt.Scale(
+                          # domain=['A', 'B'],
+                          domain=[input_text, ''],
+                          range=chart_color),  # 31333F
+                      legend=None),
+  ).properties(width=130, height=130)
+  return plot_bg + plot + text
 
-with col7:
-    st.subheader(":point_right: Total Sales by Region and City in Treemap")
-    st.plotly_chart(fig4,use_container_width=True)
+# Convert population to text 
+def format_number(num):
+    if num > 1000000:
+        if not num % 1000000:
+            return f'{num // 1000000} M'
+        return f'{round(num / 1000000, 1)} M'
+    return f'{num // 1000} K'
 
-_, view4, dwn4 = st.columns([0.5,0.45,0.45])
-with view4:
-    result2 = df[["Region","City","TotalSales"]].groupby(by=["Region","City"])["TotalSales"].sum()
-    expander = st.expander("View data for Total Sales by Region and City")
-    expander.write(result2)
-with dwn4:
-    st.download_button("Get Data", data = result2.to_csv().encode("utf-8"),
-                                        file_name="Sales_by_Region.csv", mime="text.csv")
+# Calculation year-over-year population migrations
+def calculate_population_difference(input_df, input_year):
+  selected_year_data = input_df[input_df['year'] == input_year].reset_index()
+  previous_year_data = input_df[input_df['year'] == input_year - 1].reset_index()
+  selected_year_data['population_difference'] = selected_year_data.population.sub(previous_year_data.population, fill_value=0)
+  return pd.concat([selected_year_data.states, selected_year_data.id, selected_year_data.population, selected_year_data.population_difference], axis=1).sort_values(by="population_difference", ascending=False)
 
-_,view5, dwn5 = st.columns([0.5,0.45,0.45])
-with view5:
-    expander = st.expander("View Sales Raw Data")
-    expander.write(df)
-with dwn5:
-    st.download_button("Get Raw Data", data = df.to_csv().encode("utf-8"),
-                       file_name = "SalesRawData.csv", mime="text/csv")
-st.divider()
+
+#######################
+# Dashboard Main Panel
+col = st.columns((1.5, 4.5, 2), gap='medium')
+
+with col[0]:
+    st.markdown('#### Gains/Losses')
+
+    df_population_difference_sorted = calculate_population_difference(df_reshaped, selected_year)
+
+    if selected_year > 2010:
+        first_state_name = df_population_difference_sorted.states.iloc[0]
+        first_state_population = format_number(df_population_difference_sorted.population.iloc[0])
+        first_state_delta = format_number(df_population_difference_sorted.population_difference.iloc[0])
+    else:
+        first_state_name = '-'
+        first_state_population = '-'
+        first_state_delta = ''
+    st.metric(label=first_state_name, value=first_state_population, delta=first_state_delta)
+
+    if selected_year > 2010:
+        last_state_name = df_population_difference_sorted.states.iloc[-1]
+        last_state_population = format_number(df_population_difference_sorted.population.iloc[-1])   
+        last_state_delta = format_number(df_population_difference_sorted.population_difference.iloc[-1])   
+    else:
+        last_state_name = '-'
+        last_state_population = '-'
+        last_state_delta = ''
+    st.metric(label=last_state_name, value=last_state_population, delta=last_state_delta)
+
+    
+    st.markdown('#### States Migration')
+
+    if selected_year > 2010:
+        # Filter states with population difference > 50000
+        # df_greater_50000 = df_population_difference_sorted[df_population_difference_sorted.population_difference_absolute > 50000]
+        df_greater_50000 = df_population_difference_sorted[df_population_difference_sorted.population_difference > 50000]
+        df_less_50000 = df_population_difference_sorted[df_population_difference_sorted.population_difference < -50000]
+        
+        # % of States with population difference > 50000
+        states_migration_greater = round((len(df_greater_50000)/df_population_difference_sorted.states.nunique())*100)
+        states_migration_less = round((len(df_less_50000)/df_population_difference_sorted.states.nunique())*100)
+        donut_chart_greater = make_donut(states_migration_greater, 'Inbound Migration', 'green')
+        donut_chart_less = make_donut(states_migration_less, 'Outbound Migration', 'red')
+    else:
+        states_migration_greater = 0
+        states_migration_less = 0
+        donut_chart_greater = make_donut(states_migration_greater, 'Inbound Migration', 'green')
+        donut_chart_less = make_donut(states_migration_less, 'Outbound Migration', 'red')
+
+    migrations_col = st.columns((0.2, 1, 0.2))
+    with migrations_col[1]:
+        st.write('Inbound')
+        st.altair_chart(donut_chart_greater)
+        st.write('Outbound')
+        st.altair_chart(donut_chart_less)
+
+with col[1]:
+    st.markdown('#### Total Population')
+    
+    choropleth = make_choropleth(df_selected_year, 'states_code', 'population', selected_color_theme)
+    st.plotly_chart(choropleth, use_container_width=True)
+    
+    heatmap = make_heatmap(df_reshaped, 'year', 'states', 'population', selected_color_theme)
+    st.altair_chart(heatmap, use_container_width=True)
+    
+
+with col[2]:
+    st.markdown('#### Top States')
+
+    st.dataframe(df_selected_year_sorted,
+                 column_order=("states", "population"),
+                 hide_index=True,
+                 width=None,
+                 column_config={
+                    "states": st.column_config.TextColumn(
+                        "States",
+                    ),
+                    "population": st.column_config.ProgressColumn(
+                        "Population",
+                        format="%f",
+                        min_value=0,
+                        max_value=max(df_selected_year_sorted.population),
+                     )}
+                 )
+    
+    with st.expander('About', expanded=True):
+        st.write('''
+            - Data: [U.S. Census Bureau](https://www.census.gov/data/datasets/time-series/demo/popest/2010s-state-total.html).
+            - :orange[**Gains/Losses**]: states with high inbound/ outbound migration for selected year
+            - :orange[**States Migration**]: percentage of states with annual inbound/ outbound migration > 50,000
+            ''')
