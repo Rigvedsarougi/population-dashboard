@@ -1,160 +1,227 @@
+#######################
+# Import libraries
 import streamlit as st
-import plotly.express as px
 import pandas as pd
-import os
-import warnings
-warnings.filterwarnings('ignore')
+import altair as alt
+import plotly.express as px
 
-st.set_page_config(page_title="Superstore!!!", page_icon=":bar_chart:",layout="wide")
+#######################
+# Page configuration
+st.set_page_config(
+    page_title="US Population Dashboard",
+    page_icon="🏂",
+    layout="wide",
+    initial_sidebar_state="expanded")
 
-st.title(" :bar_chart: Sample SuperStore EDA")
-st.markdown('<style>div.block-container{padding-top:1rem;}</style>',unsafe_allow_html=True)
+alt.themes.enable("dark")
 
-fl = st.file_uploader(":file_folder: Upload a file",type=(["csv","txt","xlsx","xls"]))
-if fl is not None:
-    filename = fl.name
-    st.write(filename)
-    df = pd.read_csv(filename, encoding = "ISO-8859-1")
-else:
-    #os.chdir(r"C:\Users\AEPAC\Desktop\Streamlit")
-    #df = pd.read_csv("Superstore.csv", encoding = "ISO-8859-1")
 
-col1, col2 = st.columns((2))
-df["Order Date"] = pd.to_datetime(df["Order Date"])
+#######################
+# Load data
+df_reshaped = pd.read_csv('data/us-population-2010-2019-reshaped.csv')
 
-# Getting the min and max date 
-startDate = pd.to_datetime(df["Order Date"]).min()
-endDate = pd.to_datetime(df["Order Date"]).max()
 
-with col1:
-    date1 = pd.to_datetime(st.date_input("Start Date", startDate))
+#######################
+# Sidebar
+with st.sidebar:
+    st.title('🏂 US Population Dashboard')
+    
+    year_list = list(df_reshaped.year.unique())[::-1]
+    
+    selected_year = st.selectbox('Select a year', year_list)
+    df_selected_year = df_reshaped[df_reshaped.year == selected_year]
+    df_selected_year_sorted = df_selected_year.sort_values(by="population", ascending=False)
 
-with col2:
-    date2 = pd.to_datetime(st.date_input("End Date", endDate))
+    color_theme_list = ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis']
+    selected_color_theme = st.selectbox('Select a color theme', color_theme_list)
 
-df = df[(df["Order Date"] >= date1) & (df["Order Date"] <= date2)].copy()
 
-st.sidebar.header("Choose your filter: ")
-# Create for Region
-region = st.sidebar.multiselect("Pick your Region", df["Region"].unique())
-if not region:
-    df2 = df.copy()
-else:
-    df2 = df[df["Region"].isin(region)]
+#######################
+# Plots
 
-# Create for State
-state = st.sidebar.multiselect("Pick the State", df2["State"].unique())
-if not state:
-    df3 = df2.copy()
-else:
-    df3 = df2[df2["State"].isin(state)]
+# Heatmap
+def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
+    heatmap = alt.Chart(input_df).mark_rect().encode(
+            y=alt.Y(f'{input_y}:O', axis=alt.Axis(title="Year", titleFontSize=18, titlePadding=15, titleFontWeight=900, labelAngle=0)),
+            x=alt.X(f'{input_x}:O', axis=alt.Axis(title="", titleFontSize=18, titlePadding=15, titleFontWeight=900)),
+            color=alt.Color(f'max({input_color}):Q',
+                             legend=None,
+                             scale=alt.Scale(scheme=input_color_theme)),
+            stroke=alt.value('black'),
+            strokeWidth=alt.value(0.25),
+        ).properties(width=900
+        ).configure_axis(
+        labelFontSize=12,
+        titleFontSize=12
+        ) 
+    # height=300
+    return heatmap
 
-# Create for City
-city = st.sidebar.multiselect("Pick the City",df3["City"].unique())
+# Choropleth map
+def make_choropleth(input_df, input_id, input_column, input_color_theme):
+    choropleth = px.choropleth(input_df, locations=input_id, color=input_column, locationmode="USA-states",
+                               color_continuous_scale=input_color_theme,
+                               range_color=(0, max(df_selected_year.population)),
+                               scope="usa",
+                               labels={'population':'Population'}
+                              )
+    choropleth.update_layout(
+        template='plotly_dark',
+        plot_bgcolor='rgba(0, 0, 0, 0)',
+        paper_bgcolor='rgba(0, 0, 0, 0)',
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=350
+    )
+    return choropleth
 
-# Filter the data based on Region, State and City
 
-if not region and not state and not city:
-    filtered_df = df
-elif not state and not city:
-    filtered_df = df[df["Region"].isin(region)]
-elif not region and not city:
-    filtered_df = df[df["State"].isin(state)]
-elif state and city:
-    filtered_df = df3[df["State"].isin(state) & df3["City"].isin(city)]
-elif region and city:
-    filtered_df = df3[df["Region"].isin(region) & df3["City"].isin(city)]
-elif region and state:
-    filtered_df = df3[df["Region"].isin(region) & df3["State"].isin(state)]
-elif city:
-    filtered_df = df3[df3["City"].isin(city)]
-else:
-    filtered_df = df3[df3["Region"].isin(region) & df3["State"].isin(state) & df3["City"].isin(city)]
+# Donut chart
+def make_donut(input_response, input_text, input_color):
+  if input_color == 'blue':
+      chart_color = ['#29b5e8', '#155F7A']
+  if input_color == 'green':
+      chart_color = ['#27AE60', '#12783D']
+  if input_color == 'orange':
+      chart_color = ['#F39C12', '#875A12']
+  if input_color == 'red':
+      chart_color = ['#E74C3C', '#781F16']
+    
+  source = pd.DataFrame({
+      "Topic": ['', input_text],
+      "% value": [100-input_response, input_response]
+  })
+  source_bg = pd.DataFrame({
+      "Topic": ['', input_text],
+      "% value": [100, 0]
+  })
+    
+  plot = alt.Chart(source).mark_arc(innerRadius=45, cornerRadius=25).encode(
+      theta="% value",
+      color= alt.Color("Topic:N",
+                      scale=alt.Scale(
+                          #domain=['A', 'B'],
+                          domain=[input_text, ''],
+                          # range=['#29b5e8', '#155F7A']),  # 31333F
+                          range=chart_color),
+                      legend=None),
+  ).properties(width=130, height=130)
+    
+  text = plot.mark_text(align='center', color="#29b5e8", font="Lato", fontSize=32, fontWeight=700, fontStyle="italic").encode(text=alt.value(f'{input_response} %'))
+  plot_bg = alt.Chart(source_bg).mark_arc(innerRadius=45, cornerRadius=20).encode(
+      theta="% value",
+      color= alt.Color("Topic:N",
+                      scale=alt.Scale(
+                          # domain=['A', 'B'],
+                          domain=[input_text, ''],
+                          range=chart_color),  # 31333F
+                      legend=None),
+  ).properties(width=130, height=130)
+  return plot_bg + plot + text
 
-category_df = filtered_df.groupby(by = ["Category"], as_index = False)["Sales"].sum()
+# Convert population to text 
+def format_number(num):
+    if num > 1000000:
+        if not num % 1000000:
+            return f'{num // 1000000} M'
+        return f'{round(num / 1000000, 1)} M'
+    return f'{num // 1000} K'
 
-with col1:
-    st.subheader("Category wise Sales")
-    fig = px.bar(category_df, x = "Category", y = "Sales", text = ['${:,.2f}'.format(x) for x in category_df["Sales"]],
-                 template = "seaborn")
-    st.plotly_chart(fig,use_container_width=True, height = 200)
+# Calculation year-over-year population migrations
+def calculate_population_difference(input_df, input_year):
+  selected_year_data = input_df[input_df['year'] == input_year].reset_index()
+  previous_year_data = input_df[input_df['year'] == input_year - 1].reset_index()
+  selected_year_data['population_difference'] = selected_year_data.population.sub(previous_year_data.population, fill_value=0)
+  return pd.concat([selected_year_data.states, selected_year_data.id, selected_year_data.population, selected_year_data.population_difference], axis=1).sort_values(by="population_difference", ascending=False)
 
-with col2:
-    st.subheader("Region wise Sales")
-    fig = px.pie(filtered_df, values = "Sales", names = "Region", hole = 0.5)
-    fig.update_traces(text = filtered_df["Region"], textposition = "outside")
-    st.plotly_chart(fig,use_container_width=True)
 
-cl1, cl2 = st.columns((2))
-with cl1:
-    with st.expander("Category_ViewData"):
-        st.write(category_df.style.background_gradient(cmap="Blues"))
-        csv = category_df.to_csv(index = False).encode('utf-8')
-        st.download_button("Download Data", data = csv, file_name = "Category.csv", mime = "text/csv",
-                            help = 'Click here to download the data as a CSV file')
+#######################
+# Dashboard Main Panel
+col = st.columns((1.5, 4.5, 2), gap='medium')
 
-with cl2:
-    with st.expander("Region_ViewData"):
-        region = filtered_df.groupby(by = "Region", as_index = False)["Sales"].sum()
-        st.write(region.style.background_gradient(cmap="Oranges"))
-        csv = region.to_csv(index = False).encode('utf-8')
-        st.download_button("Download Data", data = csv, file_name = "Region.csv", mime = "text/csv",
-                        help = 'Click here to download the data as a CSV file')
+with col[0]:
+    st.markdown('#### Gains/Losses')
+
+    df_population_difference_sorted = calculate_population_difference(df_reshaped, selected_year)
+
+    if selected_year > 2010:
+        first_state_name = df_population_difference_sorted.states.iloc[0]
+        first_state_population = format_number(df_population_difference_sorted.population.iloc[0])
+        first_state_delta = format_number(df_population_difference_sorted.population_difference.iloc[0])
+    else:
+        first_state_name = '-'
+        first_state_population = '-'
+        first_state_delta = ''
+    st.metric(label=first_state_name, value=first_state_population, delta=first_state_delta)
+
+    if selected_year > 2010:
+        last_state_name = df_population_difference_sorted.states.iloc[-1]
+        last_state_population = format_number(df_population_difference_sorted.population.iloc[-1])   
+        last_state_delta = format_number(df_population_difference_sorted.population_difference.iloc[-1])   
+    else:
+        last_state_name = '-'
+        last_state_population = '-'
+        last_state_delta = ''
+    st.metric(label=last_state_name, value=last_state_population, delta=last_state_delta)
+
+    
+    st.markdown('#### States Migration')
+
+    if selected_year > 2010:
+        # Filter states with population difference > 50000
+        # df_greater_50000 = df_population_difference_sorted[df_population_difference_sorted.population_difference_absolute > 50000]
+        df_greater_50000 = df_population_difference_sorted[df_population_difference_sorted.population_difference > 50000]
+        df_less_50000 = df_population_difference_sorted[df_population_difference_sorted.population_difference < -50000]
         
-filtered_df["month_year"] = filtered_df["Order Date"].dt.to_period("M")
-st.subheader('Time Series Analysis')
+        # % of States with population difference > 50000
+        states_migration_greater = round((len(df_greater_50000)/df_population_difference_sorted.states.nunique())*100)
+        states_migration_less = round((len(df_less_50000)/df_population_difference_sorted.states.nunique())*100)
+        donut_chart_greater = make_donut(states_migration_greater, 'Inbound Migration', 'green')
+        donut_chart_less = make_donut(states_migration_less, 'Outbound Migration', 'red')
+    else:
+        states_migration_greater = 0
+        states_migration_less = 0
+        donut_chart_greater = make_donut(states_migration_greater, 'Inbound Migration', 'green')
+        donut_chart_less = make_donut(states_migration_less, 'Outbound Migration', 'red')
 
-linechart = pd.DataFrame(filtered_df.groupby(filtered_df["month_year"].dt.strftime("%Y : %b"))["Sales"].sum()).reset_index()
-fig2 = px.line(linechart, x = "month_year", y="Sales", labels = {"Sales": "Amount"},height=500, width = 1000,template="gridon")
-st.plotly_chart(fig2,use_container_width=True)
+    migrations_col = st.columns((0.2, 1, 0.2))
+    with migrations_col[1]:
+        st.write('Inbound')
+        st.altair_chart(donut_chart_greater)
+        st.write('Outbound')
+        st.altair_chart(donut_chart_less)
 
-with st.expander("View Data of TimeSeries:"):
-    st.write(linechart.T.style.background_gradient(cmap="Blues"))
-    csv = linechart.to_csv(index=False).encode("utf-8")
-    st.download_button('Download Data', data = csv, file_name = "TimeSeries.csv", mime ='text/csv')
+with col[1]:
+    st.markdown('#### Total Population')
+    
+    choropleth = make_choropleth(df_selected_year, 'states_code', 'population', selected_color_theme)
+    st.plotly_chart(choropleth, use_container_width=True)
+    
+    heatmap = make_heatmap(df_reshaped, 'year', 'states', 'population', selected_color_theme)
+    st.altair_chart(heatmap, use_container_width=True)
+    
 
-# Create a treem based on Region, category, sub-Category
-st.subheader("Hierarchical view of Sales using TreeMap")
-fig3 = px.treemap(filtered_df, path = ["Region","Category","Sub-Category"], values = "Sales",hover_data = ["Sales"],
-                  color = "Sub-Category")
-fig3.update_layout(width = 800, height = 650)
-st.plotly_chart(fig3, use_container_width=True)
+with col[2]:
+    st.markdown('#### Top States')
 
-chart1, chart2 = st.columns((2))
-with chart1:
-    st.subheader('Segment wise Sales')
-    fig = px.pie(filtered_df, values = "Sales", names = "Segment", template = "plotly_dark")
-    fig.update_traces(text = filtered_df["Segment"], textposition = "inside")
-    st.plotly_chart(fig,use_container_width=True)
-
-with chart2:
-    st.subheader('Category wise Sales')
-    fig = px.pie(filtered_df, values = "Sales", names = "Category", template = "gridon")
-    fig.update_traces(text = filtered_df["Category"], textposition = "inside")
-    st.plotly_chart(fig,use_container_width=True)
-
-import plotly.figure_factory as ff
-st.subheader(":point_right: Month wise Sub-Category Sales Summary")
-with st.expander("Summary_Table"):
-    df_sample = df[0:5][["Region","State","City","Category","Sales","Profit","Quantity"]]
-    fig = ff.create_table(df_sample, colorscale = "Cividis")
-    st.plotly_chart(fig, use_container_width=True)
-
-    st.markdown("Month wise sub-Category Table")
-    filtered_df["month"] = filtered_df["Order Date"].dt.month_name()
-    sub_category_Year = pd.pivot_table(data = filtered_df, values = "Sales", index = ["Sub-Category"],columns = "month")
-    st.write(sub_category_Year.style.background_gradient(cmap="Blues"))
-
-# Create a scatter plot
-data1 = px.scatter(filtered_df, x = "Sales", y = "Profit", size = "Quantity")
-data1['layout'].update(title="Relationship between Sales and Profits using Scatter Plot.",
-                       titlefont = dict(size=20),xaxis = dict(title="Sales",titlefont=dict(size=19)),
-                       yaxis = dict(title = "Profit", titlefont = dict(size=19)))
-st.plotly_chart(data1,use_container_width=True)
-
-with st.expander("View Data"):
-    st.write(filtered_df.iloc[:500,1:20:2].style.background_gradient(cmap="Oranges"))
-
-# Download orginal DataSet
-csv = df.to_csv(index = False).encode('utf-8')
-st.download_button('Download Data', data = csv, file_name = "Data.csv",mime = "text/csv")
+    st.dataframe(df_selected_year_sorted,
+                 column_order=("states", "population"),
+                 hide_index=True,
+                 width=None,
+                 column_config={
+                    "states": st.column_config.TextColumn(
+                        "States",
+                    ),
+                    "population": st.column_config.ProgressColumn(
+                        "Population",
+                        format="%f",
+                        min_value=0,
+                        max_value=max(df_selected_year_sorted.population),
+                     )}
+                 )
+    
+    with st.expander('About', expanded=True):
+        st.write('''
+            - Data: [U.S. Census Bureau](https://www.census.gov/data/datasets/time-series/demo/popest/2010s-state-total.html).
+            - :orange[**Gains/Losses**]: states with high inbound/ outbound migration for selected year
+            - :orange[**States Migration**]: percentage of states with annual inbound/ outbound migration > 50,000
+            ''')
