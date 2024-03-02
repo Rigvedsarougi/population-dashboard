@@ -105,5 +105,19 @@ def main():
                     - States Migration: percentage of states with annual inbound/ outbound migration > 50,000.
                     ''')
 
+        # Chatbot functionality
+        st.sidebar.markdown('### Chatbot')
+
+        question = st.sidebar.text_input('Ask me anything about the dashboard:')
+        if question:
+            if 'population' in question.lower():
+                st.sidebar.write('The dashboard displays population-related information.')
+            elif 'migration' in question.lower():
+                st.sidebar.write('The dashboard includes information about population migration.')
+            elif 'data source' in question.lower():
+                st.sidebar.write('The data is sourced from the U.S. Census Bureau.')
+            else:
+                st.sidebar.write('I\'m sorry, I couldn\'t understand your question.')
+
 if __name__ == '__main__':
     main()
