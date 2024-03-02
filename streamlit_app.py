@@ -77,46 +77,43 @@ def make_choropleth(input_df, input_id, input_column, input_color_theme):
 
 # Donut chart
 def make_donut(input_response, input_text, input_color):
-  if input_color == 'blue':
-      chart_color = ['#29b5e8', '#155F7A']
-  if input_color == 'green':
-      chart_color = ['#27AE60', '#12783D']
-  if input_color == 'orange':
-      chart_color = ['#F39C12', '#875A12']
-  if input_color == 'red':
-      chart_color = ['#E74C3C', '#781F16']
+    if input_color == 'blue':
+        chart_color = ['#29b5e8', '#155F7A']
+    if input_color == 'green':
+        chart_color = ['#27AE60', '#12783D']
+    if input_color == 'orange':
+        chart_color = ['#F39C12', '#875A12']
+    if input_color == 'red':
+        chart_color = ['#E74C3C', '#781F16']
 
-  source = pd.DataFrame({
-      "Topic": ['', input_text],
-      "% value": [100-input_response, input_response]
-  })
-  source_bg = pd.DataFrame({
-      "Topic": ['', input_text],
-      "% value": [100, 0]
-  })
+    source = pd.DataFrame({
+        "Topic": ['', input_text],
+        "% value": [100-input_response, input_response]
+    })
+    source_bg = pd.DataFrame({
+        "Topic": ['', input_text],
+        "% value": [100, 0]
+    })
 
-  plot = alt.Chart(source).mark_arc(innerRadius=45, cornerRadius=25).encode(
-      theta="% value",
-      color= alt.Color("Topic:N",
-                      scale=alt.Scale(
-                          #domain=['A', 'B'],
-                          domain=[input_text, ''],
-                          # range=['#29b5e8', '#155F7A']),  # 31333F
-                          range=chart_color),
-                      legend=None),
-  ).properties(width=130, height=130)
+    plot = alt.Chart(source).mark_arc(innerRadius=45, cornerRadius=25).encode(
+        theta="% value",
+        color= alt.Color("Topic:N",
+                        scale=alt.Scale(
+                            domain=[input_text, ''],
+                            range=chart_color),
+                        legend=None),
+    ).properties(width=130, height=130)
 
-  text = plot.mark_text(align='center', color="#29b5e8", font="Lato", fontSize=32, fontWeight=700, fontStyle="italic").encode(text=alt.value(f'{input_response} %'))
-  plot_bg = alt.Chart(source_bg).mark_arc(innerRadius=45, cornerRadius=20).encode(
-      theta="% value",
-      color= alt.Color("Topic:N",
-                      scale=alt.Scale(
-                          # domain=['A', 'B'],
-                          domain=[input_text, ''],
-                          range=chart_color),  # 31333F
-                      legend=None),
-  ).properties(width=130, height=130)
-  return plot_bg + plot + text
+    text = plot.mark_text(align='center', color="#29b5e8", font="Lato", fontSize=32, fontWeight=700, fontStyle="italic").encode(text=alt.value(f'{input_response} %'))
+    plot_bg = alt.Chart(source_bg).mark_arc(innerRadius=45, cornerRadius=20).encode(
+        theta="% value",
+        color= alt.Color("Topic:N",
+                        scale=alt.Scale(
+                            domain=[input_text, ''],
+                            range=chart_color),  # 31333F
+                        legend=None),
+    ).properties(width=130, height=130)
+    return plot_bg + plot + text
 
 # Convert population to text
 def format_number(num):
@@ -128,10 +125,24 @@ def format_number(num):
 
 # Calculation year-over-year population migrations
 def calculate_population_difference(input_df, input_year):
-  selected_year_data = input_df[input_df['year'] == input_year].reset_index()
-  previous_year_data = input_df[input_df['year'] == input_year - 1].reset_index()
-  selected_year_data['population_difference'] = selected_year_data.population.sub(previous_year_data.population, fill_value=0)
-  return pd.concat([selected_year_data.states, selected_year_data.id, selected_year_data.population, selected_year_data.population_difference], axis=1).sort_values(by="population_difference", ascending=False)
+    selected_year_data = input_df[input_df['year'] == input_year].reset_index()
+    previous_year_data = input_df[input_df['year'] == input_year - 1].reset_index()
+    selected_year_data['population_difference'] = selected_year_data.population.sub(previous_year_data.population, fill_value=0)
+    return pd.concat([selected_year_data.states, selected_year_data.id, selected_year_data.population, selected_year_data.population_difference], axis=1).sort_values(by="population_difference", ascending=False)
+
+
+#######################
+# Linear trend graph
+def make_linear_trend(input_df, input_x, input_y):
+    linear_trend = alt.Chart(input_df).mark_line(color='orange').transform_regression(
+        input_x,
+        input_y,
+        method='linear',
+    ).encode(
+        x=alt.X(f'{input_x}:O', axis=alt.Axis(title="Year")),
+        y=alt.Y(f'{input_y}:Q', axis=alt.Axis(title="Population")),
+    )
+    return linear_trend
 
 
 #######################
@@ -199,6 +210,9 @@ with col[1]:
     heatmap = make_heatmap(df_reshaped, 'year', 'states', 'population', selected_color_theme)
     st.altair_chart(heatmap, use_container_width=True)
 
+    # Linear trend graph
+    linear_trend = make_linear_trend(df_selected_year, 'year', 'population')
+    st.altair_chart(linear_trend, use_container_width=True)
 
 with col[2]:
     st.markdown('#### Top States')
