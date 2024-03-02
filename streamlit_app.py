@@ -24,7 +24,7 @@ df_reshaped = pd.read_csv('data/us-population-2010-2019-reshaped.csv')
 #######################
 # Sidebar
 with st.sidebar:
-    st.title('🏂 US Population Dashboard')
+    st.title('Dashboard')
 
     year_list = list(df_reshaped.year.unique())[::-1]
 
@@ -222,6 +222,4 @@ with col[2]:
     with st.expander('About', expanded=True):
         st.write('''
             - Data: [U.S. Census Bureau](https://www.census.gov/data/datasets/time-series/demo/popest/2010s-state-total.html).
-            - :orange[**Gains/Losses**]: states with high inbound/ outbound migration for selected year
-            - :orange[**States Migration**]: percentage of states with annual inbound/ outbound migration > 50,000
             ''')
