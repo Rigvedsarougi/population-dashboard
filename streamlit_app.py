@@ -3,12 +3,24 @@ import pandas as pd
 import altair as alt
 import plotly.express as px
 
+# Function to detect column types
+def detect_column_types(df):
+    column_types = {}
+    for column in df.columns:
+        if pd.api.types.is_numeric_dtype(df[column]):
+            column_types[column] = 'numeric'
+        elif pd.api.types.is_string_dtype(df[column]):
+            column_types[column] = 'categorical'
+        else:
+            column_types[column] = 'other'
+    return column_types
+
 # Function to make heatmap
 def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
     heatmap = alt.Chart(input_df).mark_rect().encode(
         y=alt.Y(f'{input_y}:O', axis=alt.Axis(title="Year", titleFontSize=18, titlePadding=15, titleFontWeight=900, labelAngle=0)),
         x=alt.X(f'{input_x}:O', axis=alt.Axis(title="", titleFontSize=18, titlePadding=15, titleFontWeight=900)),
-        color=alt.Color(f'max({input_color}):Q',
+        color=alt.Color(f'{input_color}:Q',
                         legend=None,
                         scale=alt.Scale(scheme=input_color_theme)),
         stroke=alt.value('black'),
@@ -19,91 +31,59 @@ def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
     )
     return heatmap
 
-# Function to make choropleth map
-def make_choropleth(input_df, input_id, input_column, input_color_theme):
-    choropleth = px.choropleth(input_df, locations=input_id, color=input_column, locationmode="USA-states",
-                               color_continuous_scale=input_color_theme,
-                               range_color=(0, max(input_df[input_column])),
-                               scope="usa",
-                               labels={'population':'Population'}
-                              )
-    choropleth.update_layout(
-        template='plotly_dark',
-        plot_bgcolor='rgba(0, 0, 0, 0)',
-        paper_bgcolor='rgba(0, 0, 0, 0)',
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=350
-    )
-    return choropleth
+# Function to make bar chart
+def make_bar_chart(input_df, x_column, y_column):
+    bar_chart = alt.Chart(input_df).mark_bar().encode(
+        x=x_column,
+        y=y_column
+    ).properties(width=700)
+    return bar_chart
 
-# Function to calculate year-over-year population migrations
-def calculate_population_difference(input_df, input_year):
-    selected_year_data = input_df[input_df['year'] == input_year].reset_index()
-    previous_year_data = input_df[input_df['year'] == input_year - 1].reset_index()
-    selected_year_data['population_difference'] = selected_year_data.population.sub(previous_year_data.population, fill_value=0)
-    return selected_year_data
-
-# Function to format population number
-def format_number(num):
-    if num > 1000000:
-        if not num % 1000000:
-            return f'{num // 1000000} M'
-        return f'{round(num / 1000000, 1)} M'
-    return f'{num // 1000} K'
+# Function to make pie chart
+def make_pie_chart(input_df, category_column):
+    pie_chart = alt.Chart(input_df).mark_arc().encode(
+        color=category_column,
+        theta='count()'
+    ).properties(width=350, height=350)
+    return pie_chart
 
 # Main panel
 def main():
-    st.sidebar.title('🏂 Population Dashboard')
+    st.sidebar.title('🏂 Dynamic Dashboard')
     uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
 
     if uploaded_file is not None:
         # Load data
         df = pd.read_csv(uploaded_file)
 
+        # Detect column types
+        column_types = detect_column_types(df)
+
+        # Display column types
+        st.sidebar.subheader("Detected Column Types")
+        for column, ctype in column_types.items():
+            st.sidebar.write(f"{column}: {ctype}")
+
         # Sidebar selections
-        selected_year = st.sidebar.selectbox('Select a year', sorted(df.year.unique(), reverse=True))
+        selected_columns = st.sidebar.multiselect('Select Columns', list(df.columns), default=list(df.columns)[:2])
+        selected_chart_type = st.sidebar.selectbox('Select Chart Type', ['Heatmap', 'Bar Chart', 'Pie Chart'])
         selected_color_theme = st.sidebar.selectbox('Select a color theme', ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis'])
 
-        # Gains/Losses panel
-        st.title('🏂 Population Dashboard')
+        # Display data
+        st.subheader("Preview Data")
+        st.write(df[selected_columns].head())
 
-        st.markdown('#### Gains/Losses')
+        # Display visualization
+        st.subheader("Visualization")
 
-        df_population_difference_sorted = calculate_population_difference(df, selected_year)
-
-        first_state_name = df_population_difference_sorted.iloc[0]['states']
-        first_state_population = format_number(df_population_difference_sorted.iloc[0]['population'])
-        first_state_delta = format_number(df_population_difference_sorted.iloc[0]['population_difference'])
-        st.metric(label=first_state_name, value=first_state_population, delta=first_state_delta)
-
-        last_state_name = df_population_difference_sorted.iloc[-1]['states']
-        last_state_population = format_number(df_population_difference_sorted.iloc[-1]['population'])   
-        last_state_delta = format_number(df_population_difference_sorted.iloc[-1]['population_difference'])   
-        st.metric(label=last_state_name, value=last_state_population, delta=last_state_delta)
-
-        # Total Population panel
-        st.markdown('#### Total Population')
-
-        choropleth = make_choropleth(df[df['year'] == selected_year], 'states_code', 'population', selected_color_theme)
-        st.plotly_chart(choropleth, use_container_width=True)
-
-        heatmap = make_heatmap(df, 'year', 'states', 'population', selected_color_theme)
-        st.altair_chart(heatmap, use_container_width=True)
-
-        # Top States panel
-        st.markdown('#### Top States')
-
-        df_selected_year = df[df.year == selected_year]
-        df_selected_year_sorted = df_selected_year.sort_values(by="population", ascending=False)
-        
-        st.dataframe(df_selected_year_sorted[['states', 'population']],
-                     width=None)
-
-        st.markdown('''
-                    - Data: U.S. Census Bureau.
-                    - Gains/Losses: states with high inbound/ outbound migration for selected year.
-                    - States Migration: percentage of states with annual inbound/ outbound migration > 50,000.
-                    ''')
+        if selected_chart_type == 'Heatmap':
+            st.write(make_heatmap(df, selected_columns[0], selected_columns[1], selected_columns[0], selected_color_theme))
+        elif selected_chart_type == 'Bar Chart':
+            st.write(make_bar_chart(df, x_column=selected_columns[0], y_column=selected_columns[1]))
+        elif selected_chart_type == 'Pie Chart' and column_types[selected_columns[0]] == 'categorical':
+            st.write(make_pie_chart(df, category_column=selected_columns[0]))
+        else:
+            st.error("Invalid chart type or column selection.")
 
 if __name__ == '__main__':
     main()
