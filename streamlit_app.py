@@ -3,23 +3,11 @@ import pandas as pd
 import altair as alt
 import plotly.express as px
 
-# Function to detect column types
-def detect_column_types(df):
-    column_types = {}
-    for column in df.columns:
-        if pd.api.types.is_numeric_dtype(df[column]):
-            column_types[column] = 'numeric'
-        elif pd.api.types.is_string_dtype(df[column]):
-            column_types[column] = 'categorical'
-        else:
-            column_types[column] = 'other'
-    return column_types
-
 # Function to make heatmap
-def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
+def make_heatmap(input_df, input_x, input_y, input_color, input_color_theme):
     heatmap = alt.Chart(input_df).mark_rect().encode(
-        y=alt.Y(f'{input_y}:O', axis=alt.Axis(title="Year", titleFontSize=18, titlePadding=15, titleFontWeight=900, labelAngle=0)),
         x=alt.X(f'{input_x}:O', axis=alt.Axis(title="", titleFontSize=18, titlePadding=15, titleFontWeight=900)),
+        y=alt.Y(f'{input_y}:O', axis=alt.Axis(title="Year", titleFontSize=18, titlePadding=15, titleFontWeight=900, labelAngle=0)),
         color=alt.Color(f'{input_color}:Q',
                         legend=None,
                         scale=alt.Scale(scheme=input_color_theme)),
@@ -32,17 +20,17 @@ def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
     return heatmap
 
 # Function to make bar chart
-def make_bar_chart(input_df, x_column, y_column):
+def make_bar_chart(input_df, input_x, input_y):
     bar_chart = alt.Chart(input_df).mark_bar().encode(
-        x=x_column,
-        y=y_column
+        x=alt.X(f'{input_x}:O', axis=alt.Axis(title="", titleFontSize=18, titlePadding=15, titleFontWeight=900)),
+        y=alt.Y(f'{input_y}:Q', axis=alt.Axis(title="Count", titleFontSize=18, titlePadding=15, titleFontWeight=900))
     ).properties(width=700)
     return bar_chart
 
 # Function to make pie chart
-def make_pie_chart(input_df, category_column):
+def make_pie_chart(input_df, input_column):
     pie_chart = alt.Chart(input_df).mark_arc().encode(
-        color=category_column,
+        color=alt.Color(f'{input_column}:O', legend=None),
         theta='count()'
     ).properties(width=350, height=350)
     return pie_chart
@@ -56,16 +44,8 @@ def main():
         # Load data
         df = pd.read_csv(uploaded_file)
 
-        # Detect column types
-        column_types = detect_column_types(df)
-
-        # Display column types
-        st.sidebar.subheader("Detected Column Types")
-        for column, ctype in column_types.items():
-            st.sidebar.write(f"{column}: {ctype}")
-
         # Sidebar selections
-        selected_columns = st.sidebar.multiselect('Select Columns', list(df.columns), default=list(df.columns)[:2])
+        selected_columns = st.sidebar.multiselect('Select Columns', list(df.columns), default=[df.columns[0]])
         selected_chart_type = st.sidebar.selectbox('Select Chart Type', ['Heatmap', 'Bar Chart', 'Pie Chart'])
         selected_color_theme = st.sidebar.selectbox('Select a color theme', ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis'])
 
@@ -77,13 +57,20 @@ def main():
         st.subheader("Visualization")
 
         if selected_chart_type == 'Heatmap':
-            st.write(make_heatmap(df, selected_columns[0], selected_columns[1], selected_columns[0], selected_color_theme))
+            if len(selected_columns) >= 3:
+                st.write(make_heatmap(df, input_x=selected_columns[0], input_y=selected_columns[1], input_color=selected_columns[2], input_color_theme=selected_color_theme))
+            else:
+                st.error("Heatmap requires at least three columns.")
         elif selected_chart_type == 'Bar Chart':
-            st.write(make_bar_chart(df, x_column=selected_columns[0], y_column=selected_columns[1]))
-        elif selected_chart_type == 'Pie Chart' and column_types[selected_columns[0]] == 'categorical':
-            st.write(make_pie_chart(df, category_column=selected_columns[0]))
-        else:
-            st.error("Invalid chart type or column selection.")
+            if len(selected_columns) >= 2:
+                st.write(make_bar_chart(df, input_x=selected_columns[0], input_y=selected_columns[1]))
+            else:
+                st.error("Bar Chart requires at least two columns.")
+        elif selected_chart_type == 'Pie Chart':
+            if len(selected_columns) >= 1:
+                st.write(make_pie_chart(df, input_column=selected_columns[0]))
+            else:
+                st.error("Pie Chart requires at least one column.")
 
 if __name__ == '__main__':
     main()
