@@ -36,6 +36,7 @@ def make_choropleth(input_df, input_id, input_column, input_color_theme):
     )
     return choropleth
 
+
 # Function to calculate year-over-year population migrations
 def calculate_population_difference(input_df, input_year):
     selected_year_data = input_df[input_df['year'] == input_year].reset_index()
