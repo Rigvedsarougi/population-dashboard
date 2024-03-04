@@ -6,9 +6,9 @@ import plotly.express as px
 # Function to make heatmap
 def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
     heatmap = alt.Chart(input_df).mark_rect().encode(
-        y=alt.Y(f'{input_y}:O', axis=alt.Axis(title="Year", titleFontSize=18, titlePadding=15, titleFontWeight=900, labelAngle=0)),
-        x=alt.X(f'{input_x}:O', axis=alt.Axis(title="", titleFontSize=18, titlePadding=15, titleFontWeight=900)),
-        color=alt.Color(f'max({input_color}):Q',
+        y=alt.Y(f'{input_y}:O', axis=alt.Axis(title="State", titleFontSize=18, titlePadding=15, titleFontWeight=900, labelAngle=0)),
+        x=alt.X(f'{input_x}:O', axis=alt.Axis(title="Year", titleFontSize=18, titlePadding=15, titleFontWeight=900)),
+        color=alt.Color(f'{input_color}:Q',
                         legend=None,
                         scale=alt.Scale(scheme=input_color_theme)),
         stroke=alt.value('black'),
@@ -23,9 +23,8 @@ def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
 def make_choropleth(input_df, input_id, input_column, input_color_theme):
     choropleth = px.choropleth(input_df, locations=input_id, color=input_column, locationmode="USA-states",
                                color_continuous_scale=input_color_theme,
-                               range_color=(0, max(input_df[input_column])),
                                scope="usa",
-                               labels={'population':'Population'}
+                               labels={input_column:'Population'}
                               )
     choropleth.update_layout(
         template='plotly_dark',
@@ -74,12 +73,12 @@ def main():
         first_state_name = df_population_difference_sorted.iloc[0]['states']
         first_state_population = format_number(df_population_difference_sorted.iloc[0]['population'])
         first_state_delta = format_number(df_population_difference_sorted.iloc[0]['population_difference'])
-        st.metric(label=first_state_name, value=first_state_population, delta=first_state_delta)
+        st.write(f"**{first_state_name}**: {first_state_population} ({first_state_delta})")
 
         last_state_name = df_population_difference_sorted.iloc[-1]['states']
         last_state_population = format_number(df_population_difference_sorted.iloc[-1]['population'])   
         last_state_delta = format_number(df_population_difference_sorted.iloc[-1]['population_difference'])   
-        st.metric(label=last_state_name, value=last_state_population, delta=last_state_delta)
+        st.write(f"**{last_state_name}**: {last_state_population} ({last_state_delta})")
 
         # Total Population panel
         st.markdown('#### Total Population')
@@ -103,6 +102,7 @@ def main():
                     - Utilizing U.S. Census Bureau data, the project examines migration patterns across states for a specific year, focusing on identifying states experiencing significant inbound and outbound migration.
                     - Through analysis, the project calculates the percentage of states with annual inbound and outbound migration, offering insights into overall migration trends within the United States.
                     - The project aims to understand the factors driving population movements and their implications for states' populations, economies, and social dynamics, ultimately contributing to informed policy discussions and decision-making processes.
+                    - Data Source: U.S. Census Bureau
                     ''')
 
         # Chatbot functionality
