@@ -53,7 +53,7 @@ def format_number(num):
 
 # Main panel
 def main():
-    st.sidebar.title('🏂 Population Dashboard')
+    st.sidebar.title('Dashboard')
     uploaded_file = st.sidebar.file_uploader("Upload a CSV file", type=["csv"])
 
     if uploaded_file is not None:
@@ -65,7 +65,7 @@ def main():
         selected_color_theme = st.sidebar.selectbox('Select a color theme', ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis'])
 
         # Gains/Losses panel
-        st.title('🏂 Population Dashboard')
+        st.title('Dashboard')
 
         st.markdown('#### Gains/Losses')
 
@@ -100,9 +100,9 @@ def main():
                      width=None)
 
         st.markdown('''
-                    - Data: U.S. Census Bureau.
-                    - Gains/Losses: states with high inbound/ outbound migration for selected year.
-                    - States Migration: percentage of states with annual inbound/ outbound migration > 50,000.
+                    - Utilizing U.S. Census Bureau data, the project examines migration patterns across states for a specific year, focusing on identifying states experiencing significant inbound and outbound migration.
+                    - Through analysis, the project calculates the percentage of states with annual inbound and outbound migration, offering insights into overall migration trends within the United States.
+                    - The project aims to understand the factors driving population movements and their implications for states' populations, economies, and social dynamics, ultimately contributing to informed policy discussions and decision-making processes.
                     ''')
 
         # Chatbot functionality
