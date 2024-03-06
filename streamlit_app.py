@@ -68,10 +68,7 @@ st.markdown("""
 #######################
 # Load data
 uploaded_file = st.sidebar.file_uploader("Upload CSV file", type="csv")
-if uploaded_file is not None:
-    df_reshaped = pd.read_csv(uploaded_file)
-else:
-    df_reshaped = pd.read_csv('data/us-population-2010-2019-reshaped.csv')
+df_reshaped = pd.read_csv(uploaded_file)
 
 
 #######################
