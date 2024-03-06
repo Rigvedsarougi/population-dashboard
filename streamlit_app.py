@@ -1,25 +1,20 @@
-#######################
 # Import libraries
 import streamlit as st
 import pandas as pd
 import altair as alt
 import plotly.express as px
 
-#######################
 # Page configuration
 st.set_page_config(
     page_title="US Population Dashboard",
     page_icon="🏂",
     layout="wide",
-    initial_sidebar_state="expanded")
+    initial_sidebar_state="expanded"
+)
 
-alt.themes.enable("dark")
-
-#######################
 # CSS styling
 st.markdown("""
 <style>
-
 [data-testid="block-container"] {
     padding-left: 2rem;
     padding-right: 2rem;
@@ -27,24 +22,20 @@ st.markdown("""
     padding-bottom: 0rem;
     margin-bottom: -7rem;
 }
-
 [data-testid="stVerticalBlock"] {
     padding-left: 0rem;
     padding-right: 0rem;
 }
-
 [data-testid="stMetric"] {
     background-color: #393939;
     text-align: center;
     padding: 15px 0;
 }
-
 [data-testid="stMetricLabel"] {
-  display: flex;
-  justify-content: center;
-  align-items: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
-
 [data-testid="stMetricDeltaIcon-Up"] {
     position: relative;
     left: 38%;
@@ -52,7 +43,6 @@ st.markdown("""
     -ms-transform: translateX(-50%);
     transform: translateX(-50%);
 }
-
 [data-testid="stMetricDeltaIcon-Down"] {
     position: relative;
     left: 38%;
@@ -60,34 +50,30 @@ st.markdown("""
     -ms-transform: translateX(-50%);
     transform: translateX(-50%);
 }
-
 </style>
 """, unsafe_allow_html=True)
 
+# Load data
+@st.cache
+def load_data():
+    return pd.read_csv('data/us-population-2010-2019-reshaped.csv')
 
-#######################
+df_reshaped = load_data()
+
 # Sidebar
-with st.sidebar:
-    st.title('🏂 US Population Dashboard')
-    
-    # File uploader
-    st.markdown("### Upload CSV File")
-    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+st.sidebar.title('🏂 US Population Dashboard')
 
-    if uploaded_file is not None:
-        # Read uploaded CSV file
-        df_reshaped = pd.read_csv(uploaded_file)
+# Sidebar configuration
+year_list = list(df_reshaped.year.unique())[::-1]
+selected_year = st.sidebar.selectbox('Select a year', year_list)
 
-        year_list = list(df_reshaped.year.unique())[::-1]
-        selected_year = st.selectbox('Select a year', year_list)
-        df_selected_year = df_reshaped[df_reshaped.year == selected_year]
-        df_selected_year_sorted = df_selected_year.sort_values(by="population", ascending=False)
+color_theme_list = ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis']
+selected_color_theme = st.sidebar.selectbox('Select a color theme', color_theme_list)
 
-
-#######################
 # Plots
 
 # Heatmap
+@st.cache
 def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
     heatmap = alt.Chart(input_df).mark_rect().encode(
             y=alt.Y(f'{input_y}:O', axis=alt.Axis(title="Year", titleFontSize=18, titlePadding=15, titleFontWeight=900, labelAngle=0)),
@@ -106,6 +92,7 @@ def make_heatmap(input_df, input_y, input_x, input_color, input_color_theme):
     return heatmap
 
 # Choropleth map
+@st.cache
 def make_choropleth(input_df, input_id, input_column, input_color_theme):
     choropleth = px.choropleth(input_df, locations=input_id, color=input_column, locationmode="USA-states",
                                color_continuous_scale=input_color_theme,
@@ -121,7 +108,6 @@ def make_choropleth(input_df, input_id, input_column, input_color_theme):
         height=350
     )
     return choropleth
-
 
 # Donut chart
 def make_donut(input_response, input_text, input_color):
@@ -181,8 +167,6 @@ def calculate_population_difference(input_df, input_year):
   selected_year_data['population_difference'] = selected_year_data.population.sub(previous_year_data.population, fill_value=0)
   return pd.concat([selected_year_data.states, selected_year_data.id, selected_year_data.population, selected_year_data.population_difference], axis=1).sort_values(by="population_difference", ascending=False)
 
-
-#######################
 # Dashboard Main Panel
 col = st.columns((1.5, 4.5, 2), gap='medium')
 
@@ -241,7 +225,7 @@ with col[0]:
 with col[1]:
     st.markdown('#### Total Population')
     
-    choropleth = make_choropleth(df_selected_year, 'states_code', 'population', selected_color_theme)
+    choropleth = make_choropleth(df_reshaped, 'states_code', 'population', selected_color_theme)
     st.plotly_chart(choropleth, use_container_width=True)
     
     heatmap = make_heatmap(df_reshaped, 'year', 'states', 'population', selected_color_theme)
@@ -251,7 +235,7 @@ with col[1]:
 with col[2]:
     st.markdown('#### Top States')
 
-    st.dataframe(df_selected_year_sorted,
+    st.dataframe(df_reshaped,
                  column_order=("states", "population"),
                  hide_index=True,
                  width=None,
@@ -263,7 +247,7 @@ with col[2]:
                         "Population",
                         format="%f",
                         min_value=0,
-                        max_value=max(df_selected_year_sorted.population),
+                        max_value=max(df_reshaped.population),
                      )}
                  )
     
@@ -273,3 +257,4 @@ with col[2]:
             - :orange[**Gains/Losses**]: states with high inbound/ outbound migration for selected year
             - :orange[**States Migration**]: percentage of states with annual inbound/ outbound migration > 50,000
             ''')
+
