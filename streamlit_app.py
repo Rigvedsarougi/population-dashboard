@@ -66,26 +66,22 @@ st.markdown("""
 
 
 #######################
-# Load data
-uploaded_file = st.sidebar.file_uploader("Upload CSV file", type="csv")
-if uploaded_file is not None:
-    df_reshaped = pd.read_csv(uploaded_file)
-else:
-    df_reshaped = pd.read_csv('data/us-population-2010-2019-reshaped.csv')
-
-
-#######################
 # Sidebar
 with st.sidebar:
     st.title('🏂 US Population Dashboard')
     
+    # File uploader
+    st.markdown("### Upload CSV File")
+    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
+
+    if uploaded_file is not None:
+        # Read uploaded CSV file
+        df_reshaped = pd.read_csv(uploaded_file)
+
     year_list = list(df_reshaped.year.unique())[::-1]
     selected_year = st.selectbox('Select a year', year_list)
     df_selected_year = df_reshaped[df_reshaped.year == selected_year]
     df_selected_year_sorted = df_selected_year.sort_values(by="population", ascending=False)
-
-    color_theme_list = ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis']
-    selected_color_theme = st.selectbox('Select a color theme', color_theme_list)
 
 
 #######################
